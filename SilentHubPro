@@ -1,0 +1,435 @@
+-- SilentBoot Supremo by Nako & Linus
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- GUI Setup
+local ScreenGui = Instance.new("ScreenGui", PlayerGui)
+ScreenGui.Name = "SilentBootSupremoGui"
+
+local Frame = Instance.new("Frame", ScreenGui)
+Frame.Size = UDim2.new(0, 450, 0, 520)
+Frame.Position = UDim2.new(0.5, -225, 0.5, -260)
+Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Frame.BorderSizePixel = 0
+
+local Title = Instance.new("TextLabel", Frame)
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundTransparency = 1
+Title.Text = "SilentBoot Supremo"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextScaled = true
+Title.Font = Enum.Font.SourceSansBold
+
+-- Variables
+local remotes = {}
+local selectedRemote = nil
+local selectedPlayer = nil
+local selectedAction = nil
+local selectedSoundId = nil
+
+-- Helpers
+local function ClearChildren(parent)
+    for _, child in pairs(parent:GetChildren()) do
+        child:Destroy()
+    end
+end
+
+-- UI Elements Functions
+
+-- Remote Filter and Listing
+local RemoteFilterFrame = Instance.new("Frame", Frame)
+RemoteFilterFrame.Position = UDim2.new(0, 10, 0, 50)
+RemoteFilterFrame.Size = UDim2.new(1, -20, 0, 30)
+RemoteFilterFrame.BackgroundTransparency = 1
+
+local RemoteEventCheckbox = Instance.new("TextButton", RemoteFilterFrame)
+RemoteEventCheckbox.Text = "RemoteEvents ✓"
+RemoteEventCheckbox.Size = UDim2.new(0, 140, 1, 0)
+RemoteEventCheckbox.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+RemoteEventCheckbox.TextColor3 = Color3.new(1, 1, 1)
+
+local RemoteFunctionCheckbox = Instance.new("TextButton", RemoteFilterFrame)
+RemoteFunctionCheckbox.Text = "RemoteFunctions ✓"
+RemoteFunctionCheckbox.Size = UDim2.new(0, 140, 1, 0)
+RemoteFunctionCheckbox.Position = UDim2.new(0, 150, 0, 0)
+RemoteFunctionCheckbox.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+RemoteFunctionCheckbox.TextColor3 = Color3.new(1, 1, 1)
+
+local showRemoteEvents = true
+local showRemoteFunctions = true
+
+local function ToggleCheckbox(button, current)
+    if current then
+        button.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+        button.Text = button.Text:gsub("✓", "✗")
+        return false
+    else
+        button.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+        button.Text = button.Text:gsub("✗", "✓")
+        return true
+    end
+end
+
+RemoteEventCheckbox.MouseButton1Click:Connect(function()
+    showRemoteEvents = ToggleCheckbox(RemoteEventCheckbox, showRemoteEvents)
+    UpdateRemoteList()
+end)
+
+RemoteFunctionCheckbox.MouseButton1Click:Connect(function()
+    showRemoteFunctions = ToggleCheckbox(RemoteFunctionCheckbox, showRemoteFunctions)
+    UpdateRemoteList()
+end)
+
+local RemoteListFrame = Instance.new("ScrollingFrame", Frame)
+RemoteListFrame.Position = UDim2.new(0, 10, 0, 85)
+RemoteListFrame.Size = UDim2.new(1, -20, 0, 200)
+RemoteListFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+RemoteListFrame.BorderSizePixel = 0
+RemoteListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+RemoteListFrame.ScrollBarThickness = 6
+
+local function TestRemote(remote)
+    local success = false
+    local param = LocalPlayer
+    if remote:IsA("RemoteEvent") then
+        success = pcall(function()
+            remote:FireServer(param)
+        end)
+    elseif remote:IsA("RemoteFunction") then
+        success = pcall(function()
+            remote:InvokeServer(param)
+        end)
+    end
+    return success
+end
+
+function UpdateRemoteList()
+    ClearChildren(RemoteListFrame)
+    remotes = {}
+    for _, obj in pairs(ReplicatedStorage:GetChildren()) do
+        if (showRemoteEvents and obj:IsA("RemoteEvent")) or (showRemoteFunctions and obj:IsA("RemoteFunction")) then
+            table.insert(remotes, obj)
+        end
+    end
+    for _, obj in pairs(workspace:GetChildren()) do
+        if (showRemoteEvents and obj:IsA("RemoteEvent")) or (showRemoteFunctions and obj:IsA("RemoteFunction")) then
+            table.insert(remotes, obj)
+        end
+    end
+
+    local yPos = 0
+    for i, remote in ipairs(remotes) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, 0, 0, 30)
+        btn.Position = UDim2.new(0, 0, 0, yPos)
+        btn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+        btn.BorderSizePixel = 0
+        btn.Text = remote.Name .. " (" .. remote.ClassName .. ")"
+        btn.TextColor3 = Color3.new(1, 1, 1)
+        btn.TextScaled = true
+        btn.Parent = RemoteListFrame
+
+        local isProtected = not TestRemote(remote)
+        if isProtected then
+            btn.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
+        else
+            btn.BackgroundColor3 = Color3.fromRGB(40, 150, 40)
+        end
+
+        btn.MouseButton1Click:Connect(function()
+            if selectedRemote and selectedRemoteButton then
+                local prevProtected = not TestRemote(selectedRemote)
+                selectedRemoteButton.BackgroundColor3 = prevProtected and Color3.fromRGB(150, 40, 40) or Color3.fromRGB(40, 150, 40)
+            end
+            selectedRemote = remote
+            selectedRemoteButton = btn
+            btn.BackgroundColor3 = Color3.fromRGB(100, 170, 255)
+        end)
+
+        yPos = yPos + 35
+    end
+    RemoteListFrame.CanvasSize = UDim2.new(0, 0, 0, yPos)
+end
+
+UpdateRemoteList()
+
+-- Player selection
+local PlayerInput = Instance.new("TextBox", Frame)
+PlayerInput.Position = UDim2.new(0, 10, 0, 290)
+PlayerInput.Size = UDim2.new(1, -20, 0, 30)
+PlayerInput.PlaceholderText = "Digite o nome do jogador"
+PlayerInput.TextColor3 = Color3.new(1, 1, 1)
+PlayerInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+PlayerInput.BorderSizePixel = 0
+
+-- Action selection dropdown
+local ActionDropdown = Instance.new("TextButton", Frame)
+ActionDropdown.Position = UDim2.new(0, 10, 0, 330)
+ActionDropdown.Size = UDim2.new(1, -20, 0, 30)
+ActionDropdown.Text = "Selecione Ação"
+ActionDropdown.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+ActionDropdown.TextColor3 = Color3.new(1, 1, 1)
+ActionDropdown.AutoButtonColor = false
+
+local ActionList = Instance.new("Frame", Frame)
+ActionList.Position = UDim2.new(0, 10, 0, 360)
+ActionList.Size = UDim2.new(1, -20, 0, 150)
+ActionList.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+ActionList.BorderSizePixel = 0
+ActionList.Visible = false
+ActionList.ClipsDescendants = true
+
+local actions = {
+    "Kickar",
+    "Fling",
+    "Tocar Áudio",
+    "Spawn Troll",
+    "Seguir Jogador",
+    "Teleportar para Jogador",
+    "Insta Kill",
+    "Voar",
+    "Modificar Jogador"
+}
+
+local function ClearChildren(parent)
+    for _, c in pairs(parent:GetChildren()) do
+        if not (c:IsA("UIListLayout") or c:IsA("UIPadding")) then
+            c:Destroy()
+        end
+    end
+end
+
+local SelectedActionButton = nil
+
+local function UpdateActionList()
+    ClearChildren(ActionList)
+    local yPos = 0
+    for i, act in ipairs(actions) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, 0, 0, 30)
+        btn.Position = UDim2.new(0, 0, 0, yPos)
+        btn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+        btn.BorderSizePixel = 0
+        btn.Text = act
+        btn.TextColor3 = Color3.new(1, 1, 1)
+        btn.TextScaled = true
+        btn.Parent = ActionList
+
+        btn.MouseButton1Click:Connect(function()
+            selectedAction = act
+            ActionDropdown.Text = act
+            ActionList.Visible = false
+            if SelectedActionButton then
+                SelectedActionButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+            end
+            SelectedActionButton = btn
+            btn.BackgroundColor3 = Color3.fromRGB(100, 170, 255)
+        end)
+
+        yPos = yPos + 35
+    end
+    ActionList.CanvasSize = UDim2.new(0, 0, 0, yPos)
+end
+
+ActionDropdown.MouseButton1Click:Connect(function()
+    ActionList.Visible = not ActionList.Visible
+end)
+
+UpdateActionList()
+
+-- Sounds
+local Sounds = {
+    ["Grito Terror"] = "rbxassetid://9118822479",  -- exemplo
+    ["Grito Tubers93"] = "rbxassetid://1234567890", -- substitua pelo ID correto
+    ["Risada Demoníaca"] = "rbxassetid://9118822480",
+}
+
+local SoundDropdown = Instance.new("TextButton", Frame)
+SoundDropdown.Position = UDim2.new(0, 10, 0, 500)
+SoundDropdown.Size = UDim2.new(1, -20, 0, 30)
+SoundDropdown.Text = "Selecionar Áudio"
+SoundDropdown.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+SoundDropdown.TextColor3 = Color3.new(1, 1, 1)
+SoundDropdown.AutoButtonColor = false
+SoundDropdown.Visible = false
+
+local SoundList = Instance.new("Frame", Frame)
+SoundList.Position = UDim2.new(0, 10, 0, 530)
+SoundList.Size = UDim2.new(1, -20, 0, 120)
+SoundList.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+SoundList.BorderSizePixel = 0
+SoundList.Visible = false
+SoundList.ClipsDescendants = true
+
+local SelectedSoundButton = nil
+
+local function UpdateSoundList()
+    ClearChildren(SoundList)
+    local yPos = 0
+    for name, id in pairs(Sounds) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, 0, 0, 30)
+        btn.Position = UDim2.new(0, 0, 0, yPos)
+        btn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+        btn.BorderSizePixel = 0
+        btn.Text = name
+        btn.TextColor3 = Color3.new(1, 1, 1)
+        btn.TextScaled = true
+        btn.Parent = SoundList
+
+        btn.MouseButton1Click:Connect(function()
+            selectedSoundId = id
+            SoundDropdown.Text = name
+            SoundList.Visible = false
+            if SelectedSoundButton then
+                SelectedSoundButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+            end
+            SelectedSoundButton = btn
+            btn.BackgroundColor3 = Color3.fromRGB(100, 170, 255)
+        end)
+
+        yPos = yPos + 35
+    end
+    SoundList.CanvasSize = UDim2.new(0, 0, 0, yPos)
+end
+
+SoundDropdown.MouseButton1Click:Connect(function()
+    SoundList.Visible = not SoundList.Visible
+end)
+
+UpdateSoundList()
+
+-- Kick function
+local function KickPlayer()
+    if not selectedRemote then
+        warn("Selecione um remote.")
+        return
+    end
+    local playerName = PlayerInput.Text
+    if playerName == "" then
+        warn("Digite o nome do jogador.")
+        return
+    end
+    local targetPlayer = Players:FindFirstChild(playerName)
+    if not targetPlayer then
+        warn("Jogador não encontrado.")
+        return
+    end
+
+    if selectedAction == "Kickar" then
+        if selectedRemote:IsA("RemoteEvent") then
+            pcall(function()
+                selectedRemote:FireServer(targetPlayer)
+            end)
+        elseif selectedRemote:IsA("RemoteFunction") then
+            pcall(function()
+                selectedRemote:InvokeServer(targetPlayer)
+            end)
+        end
+
+    elseif selectedAction == "Fling" then
+        local character = targetPlayer.Character
+        if character and character:FindFirstChild("HumanoidRootPart") then
+            character.HumanoidRootPart.Velocity = Vector3.new(0, 500, 0)
+        end
+
+    elseif selectedAction == "Tocar Áudio" then
+        if selectedSoundId then
+            for _, p in pairs(Players:GetPlayers()) do
+                local char = p.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    local sound = Instance.new("Sound", char.HumanoidRootPart)
+                    sound.SoundId = selectedSoundId
+                    sound.Volume = 1
+                    sound:Play()
+                    game:GetService("Debris"):AddItem(sound, 6)
+                end
+            end
+        end
+
+    elseif selectedAction == "Spawn Troll" then
+        local char = targetPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            local chair = Instance.new("Seat")
+            chair.Name = "TrollChair"
+            chair.Size = Vector3.new(5,1,5)
+            chair.Position = char.HumanoidRootPart.Position + Vector3.new(0, 3, 0)
+            chair.Anchored = false
+            chair.CanCollide = true
+            chair.Parent = workspace
+            -- Colocar cor troll
+            chair.BrickColor = BrickColor.new("Bright red")
+        end
+
+    elseif selectedAction == "Seguir Jogador" then
+        local char = LocalPlayer.Character
+        local targetChar = targetPlayer.Character
+        if char and targetChar and targetChar:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("HumanoidRootPart") then
+            local followConnection
+            followConnection = RunService.Heartbeat:Connect(function()
+                if not targetChar or not targetChar:FindFirstChild("HumanoidRootPart") or not char:FindFirstChild("HumanoidRootPart") then
+                    if followConnection then followConnection:Disconnect() end
+                    return
+                end
+                char.HumanoidRootPart.CFrame = targetChar.HumanoidRootPart.CFrame * CFrame.new(2, 0, 0)
+            end)
+            wait(10)
+            if followConnection then followConnection:Disconnect() end
+        end
+
+    elseif selectedAction == "Teleportar para Jogador" then
+        local char = LocalPlayer.Character
+        local targetChar = targetPlayer.Character
+        if char and targetChar and char:FindFirstChild("HumanoidRootPart") and targetChar:FindFirstChild("HumanoidRootPart") then
+            char.HumanoidRootPart.CFrame = targetChar.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
+        end
+
+    elseif selectedAction == "Insta Kill" then
+        local char = targetPlayer.Character
+        if char and char:FindFirstChild("Humanoid") then
+            char.Humanoid.Health = 0
+        end
+
+    elseif selectedAction == "Voar" then
+        local char = LocalPlayer.Character
+        local humanoid = char and char:FindFirstChild("Humanoid")
+        if humanoid then
+            local flying = true
+            local bodyVelocity = Instance.new("BodyVelocity")
+            bodyVelocity.MaxForce = Vector3.new(1e5,1e5,1e5)
+            bodyVelocity.Velocity = Vector3.new(0,0,0)
+            bodyVelocity.Parent = char.HumanoidRootPart
+
+            local function Fly()
+                local cam = workspace.CurrentCamera
+                local direction = Vector3.new()
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) then direction = direction + cam.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.S) then direction = direction - cam.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) then direction = direction - cam.CFrame.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.D) then direction = direction + cam.CFrame.RightVector end
+                bodyVelocity.Velocity = direction * 50 + Vector3.new(0, 0, 0)
+            end
+
+            local conn
+            conn = RunService.Heartbeat:Connect(Fly)
+            wait(10)
+            conn:Disconnect()
+            bodyVelocity:Destroy()
+        end
+
+    elseif selectedAction == "Modificar Jogador" then
+        local char = LocalPlayer.Character
+        local humanoid = char and char:FindFirstChild("Humanoid")
+        if humanoid then
+            humanoid.WalkSpeed = 100 -- exemplo
+            humanoid.JumpPower = 150 -- exemplo
+        end
+    end
+end
+
+local ExecuteButton = Instance.new("TextButton", Frame)
+ExecuteButton.Position =
