@@ -1,0 +1,205 @@
+loadstring([[
+local Players = game:GetService("Players")
+local plr = Players.LocalPlayer
+local remotes = {}
+local gui = Instance.new("ScreenGui", game.CoreGui)
+gui.Name = "SilentBootSelectorPro"
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 380, 0, 450)
+frame.Position = UDim2.new(0, 100, 0, 100)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+frame.BorderSizePixel = 0
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, 0, 0, 40)
+title.Text = "SilentBoot Selector Pro 🔧"
+title.BackgroundTransparency = 1
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 24
+
+-- Player selector
+local playerDrop = Instance.new("TextButton", frame)
+playerDrop.Size = UDim2.new(1, -20, 0, 30)
+playerDrop.Position = UDim2.new(0, 10, 0, 45)
+playerDrop.Text = "Selecionar Player"
+playerDrop.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+playerDrop.TextColor3 = Color3.new(1, 1, 1)
+
+local playersList = Players:GetPlayers()
+local chosenPlayer = playersList[2] or plr
+playerDrop.Text = "Alvo: " .. chosenPlayer.Name
+
+playerDrop.MouseButton1Click:Connect(function()
+	local listStr = ""
+	for i, p in ipairs(playersList) do
+		listStr = listStr .. i .. " - " .. p.Name .. "\n"
+	end
+	local input = plr:PromptInput("Selecionar jogador:\n" .. listStr)
+	local num = tonumber(string.match(input or "", "%d+"))
+	if num and playersList[num] then
+		chosenPlayer = playersList[num]
+		playerDrop.Text = "Alvo: " .. chosenPlayer.Name
+	end
+end)
+
+-- Scroll frame for remotes and action buttons
+local scroll = Instance.new("ScrollingFrame", frame)
+scroll.Size = UDim2.new(1, -20, 1, -120)
+scroll.Position = UDim2.new(0, 10, 0, 80)
+scroll.CanvasSize = UDim2.new(0, 0, 5, 0)
+scroll.ScrollBarThickness = 6
+scroll.BackgroundTransparency = 1
+
+-- Actions list
+local actions = {
+	{"Kick", function(r) pcall(function() r:FireServer(chosenPlayer) end) end},
+	{"Fling", function() 
+		local c = chosenPlayer.Character
+		if c and c:FindFirstChild("HumanoidRootPart") then
+			c.HumanoidRootPart.Velocity = Vector3.new(0, 999, 0)
+		end
+	end},
+	{"Teleport", function()
+		if plr.Character and chosenPlayer.Character then
+			plr.Character:MoveTo(chosenPlayer.Character:GetPivot().Position)
+		end
+	end},
+	{"Seguir", function()
+		coroutine.wrap(function()
+			while chosenPlayer and chosenPlayer.Character and wait(0.1) do
+				if plr.Character then
+					plr.Character:MoveTo(chosenPlayer.Character:GetPivot().Position + Vector3.new(2,0,2))
+				end
+			end
+		end)()
+	end},
+	{"Spawn Troll", function()
+		local p = Instance.new("Part", workspace)
+		p.Size = Vector3.new(3,1,3)
+		p.Position = chosenPlayer.Character and chosenPlayer.Character:GetPivot().Position + Vector3.new(0,5,0) or Vector3.new(0,10,0)
+		p.BrickColor = BrickColor.Random()
+		p.Anchored = false
+	end},
+	{"Áudio Global", function()
+		local s = Instance.new("Sound", workspace)
+		s.SoundId = "rbxassetid://9118823101"
+		s.Volume = 10
+		s.Looped = false
+		s:Play()
+	end},
+	{"Instakill Script", function()
+		script:Destroy()
+	end}
+}
+
+-- ESP logic
+local ESP = {}
+ESP.PlayersHighlights = {}
+ESP.SuspectsHighlights = {}
+
+local suspectedNames = {
+	"Exploitador1",
+	"Suspeito123",
+}
+
+local function clearHighlights()
+	for _, h in pairs(ESP.PlayersHighlights) do
+		if h and h.Parent then h:Destroy() end
+	end
+	ESP.PlayersHighlights = {}
+	for _, h in pairs(ESP.SuspectsHighlights) do
+		if h and h.Parent then h:Destroy() end
+	end
+	ESP.SuspectsHighlights = {}
+end
+
+local function createHighlight(character, color)
+	local highlight = Instance.new("Highlight")
+	highlight.FillColor = color
+	highlight.OutlineColor = color
+	highlight.Parent = character
+	return highlight
+end
+
+local function isSuspected(player)
+	for _, name in pairs(suspectedNames) do
+		if player.Name == name then return true end
+	end
+	return false
+end
+
+function ESP:ToggleESP()
+	if next(ESP.PlayersHighlights) or next(ESP.SuspectsHighlights) then
+		clearHighlights()
+		return
+	end
+	for _, p in pairs(Players:GetPlayers()) do
+		if p.Character and p.Character.Parent then
+			if isSuspected(p) then
+				ESP.SuspectsHighlights[p] = createHighlight(p.Character, Color3.new(1,0,0)) -- vermelho
+			else
+				ESP.PlayersHighlights[p] = createHighlight(p.Character, Color3.new(0,0.6,1)) -- azul
+			end
+		end
+	end
+end
+
+-- Function to create buttons for each remote's actions
+local function makeButton(txt, func)
+	local b = Instance.new("TextButton", scroll)
+	b.Size = UDim2.new(1, -10, 0, 30)
+	b.Position = UDim2.new(0, 5, 0, #scroll:GetChildren() * 35)
+	b.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+	b.TextColor3 = Color3.new(1,1,1)
+	b.Font = Enum.Font.SourceSans
+	b.TextSize = 16
+	b.Text = txt
+	b.MouseButton1Click:Connect(func)
+end
+
+-- Scan game for remotes
+local function scan(obj)
+	for _, v in pairs(obj:GetChildren()) do
+		if v:IsA("RemoteEvent") or v:IsA("RemoteFunction") then
+			table.insert(remotes, v)
+		end
+		scan(v)
+	end
+end
+
+scan(game)
+
+-- Buttons for remotes
+for _, remote in ipairs(remotes) do
+	local btn = Instance.new("TextButton", scroll)
+	btn.Size = UDim2.new(1, -10, 0, 30)
+	btn.Position = UDim2.new(0, 5, 0, #scroll:GetChildren() * 35)
+	local isProtected = rawget(remote, "__is_protected_by_luau__")
+	btn.BackgroundColor3 = isProtected and Color3.fromRGB(100, 30, 30) or Color3.fromRGB(40, 60, 40)
+	btn.Text = remote.Name .. (isProtected and " [PROTEGIDO]" or "")
+	btn.TextColor3 = Color3.new(1,1,1)
+	btn.Font = Enum.Font.SourceSans
+	btn.TextSize = 14
+	btn.MouseButton1Click:Connect(function()
+		for _, action in ipairs(actions) do
+			makeButton(action[1] .. " via " .. remote.Name, function() pcall(action[2], remote) end)
+		end
+	end)
+end
+
+-- ESP toggle button
+local espToggle = Instance.new("TextButton", frame)
+espToggle.Size = UDim2.new(1, -20, 0, 30)
+espToggle.Position = UDim2.new(0, 10, 1, -30)
+espToggle.BackgroundColor3 = Color3.fromRGB(30, 70, 30)
+espToggle.TextColor3 = Color3.new(1, 1, 1)
+espToggle.Font = Enum.Font.SourceSansBold
+espToggle.TextSize = 18
+espToggle.Text = "Toggle ESP (Players/Suspects)"
+
+espToggle.MouseButton1Click:Connect(function()
+	ESP:ToggleESP()
+end)
+]])()
