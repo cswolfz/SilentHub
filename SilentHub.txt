@@ -1,0 +1,185 @@
+-- Script SilentBoot: Kick + Backdoor Visualizer GUI
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local localPlayer = Players.LocalPlayer
+
+-- Criar ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "KickBackdoorGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
+
+-- Criar Frame principal
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 400, 0, 450)
+frame.Position = UDim2.new(0.5, -200, 0.5, -225)
+frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
+
+-- Título
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 40)
+title.BackgroundTransparency = 1
+title.Text = "Kick + Backdoor Visualizer"
+title.TextColor3 = Color3.new(1,1,1)
+title.TextScaled = true
+title.Font = Enum.Font.SourceSansBold
+title.Parent = frame
+
+-- Frame para filtros
+local filterFrame = Instance.new("Frame")
+filterFrame.Size = UDim2.new(1, -20, 0, 40)
+filterFrame.Position = UDim2.new(0, 10, 0, 50)
+filterFrame.BackgroundTransparency = 1
+filterFrame.Parent = frame
+
+-- Função pra criar checkbox
+local function createCheckbox(text, position, default, callback)
+    local cbFrame = Instance.new("Frame")
+    cbFrame.Size = UDim2.new(0, 120, 0, 30)
+    cbFrame.Position = position
+    cbFrame.BackgroundTransparency = 1
+    cbFrame.Parent = filterFrame
+
+    local cbBox = Instance.new("TextButton")
+    cbBox.Size = UDim2.new(0, 20, 0, 20)
+    cbBox.Position = UDim2.new(0, 0, 0, 5)
+    cbBox.BackgroundColor3 = default and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(70,70,70)
+    cbBox.BorderSizePixel = 0
+    cbBox.Text = ""
+    cbBox.Parent = cbFrame
+
+    local cbLabel = Instance.new("TextLabel")
+    cbLabel.Size = UDim2.new(1, -25, 1, 0)
+    cbLabel.Position = UDim2.new(0, 25, 0, 0)
+    cbLabel.BackgroundTransparency = 1
+    cbLabel.Text = text
+    cbLabel.TextColor3 = Color3.new(1,1,1)
+    cbLabel.TextScaled = true
+    cbLabel.TextXAlignment = Enum.TextXAlignment.Left
+    cbLabel.Parent = cbFrame
+
+    cbBox.MouseButton1Click:Connect(function()
+        cbBox.BackgroundColor3 = cbBox.BackgroundColor3 == Color3.fromRGB(0, 170, 255) and Color3.fromRGB(70,70,70) or Color3.fromRGB(0, 170, 255)
+        callback(cbBox.BackgroundColor3 == Color3.fromRGB(0, 170, 255))
+    end)
+
+    return cbBox
+end
+
+-- Lista de remotes
+local remotes = {}
+
+-- Frame da lista com scroll
+local scrollingFrame = Instance.new("ScrollingFrame")
+scrollingFrame.Size = UDim2.new(1, -20, 0, 270)
+scrollingFrame.Position = UDim2.new(0, 10, 0, 100)
+scrollingFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+scrollingFrame.BorderSizePixel = 0
+scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+scrollingFrame.ScrollBarThickness = 6
+scrollingFrame.Parent = frame
+scrollingFrame.VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar
+
+-- Input para nome do jogador
+local playerInput = Instance.new("TextBox")
+playerInput.Size = UDim2.new(1, -20, 0, 30)
+playerInput.Position = UDim2.new(0, 10, 0, 380)
+playerInput.PlaceholderText = "Digite o nome do jogador para kickar"
+playerInput.TextColor3 = Color3.new(1,1,1)
+playerInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+playerInput.BorderSizePixel = 0
+playerInput.Parent = frame
+
+-- Botão de kick
+local kickButton = Instance.new("TextButton")
+kickButton.Size = UDim2.new(1, -20, 0, 40)
+kickButton.Position = UDim2.new(0, 10, 0, 420)
+kickButton.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
+kickButton.BorderSizePixel = 0
+kickButton.Text = "Kickar Jogador"
+kickButton.TextColor3 = Color3.new(1,1,1)
+kickButton.TextScaled = true
+kickButton.Font = Enum.Font.SourceSansBold
+kickButton.Parent = frame
+
+-- Variáveis de filtro
+local showRemoteEvents = true
+local showRemoteFunctions = true
+
+-- Função para listar remotes no ReplicatedStorage e Workspace
+local function listRemotes()
+    remotes = {}
+    for _, obj in pairs(ReplicatedStorage:GetChildren()) do
+        if (showRemoteEvents and obj:IsA("RemoteEvent")) or (showRemoteFunctions and obj:IsA("RemoteFunction")) then
+            table.insert(remotes, obj)
+        end
+    end
+    for _, obj in pairs(workspace:GetChildren()) do
+        if (showRemoteEvents and obj:IsA("RemoteEvent")) or (showRemoteFunctions and obj:IsA("RemoteFunction")) then
+            table.insert(remotes, obj)
+        end
+    end
+end
+
+-- Atualizar lista de botões
+local function updateRemoteButtons()
+    for _, btn in pairs(scrollingFrame:GetChildren()) do
+        if btn:IsA("TextButton") then
+            btn:Destroy()
+        end
+    end
+
+    local yPos = 0
+    for i, remote in ipairs(remotes) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, 0, 0, 30)
+        btn.Position = UDim2.new(0, 0, 0, yPos)
+        btn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+        btn.BorderSizePixel = 0
+        btn.Text = remote.Name .. " (" .. remote.ClassName .. ")"
+        btn.TextColor3 = Color3.new(1,1,1)
+        btn.TextScaled = true
+        btn.Parent = scrollingFrame
+
+        yPos = yPos + 35
+    end
+    scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, yPos)
+end
+
+-- Inicializa lista e interface
+listRemotes()
+updateRemoteButtons()
+
+-- Checkboxes de filtro
+createCheckbox("RemoteEvent", UDim2.new(0, 0, 0, 0), true, function(enabled)
+    showRemoteEvents = enabled
+    listRemotes()
+    updateRemoteButtons()
+end)
+
+createCheckbox("RemoteFunction", UDim2.new(0, 130, 0, 0), true, function(enabled)
+    showRemoteFunctions = enabled
+    listRemotes()
+    updateRemoteButtons()
+end)
+
+-- Função para tentar kickar o jogador via remotes
+local function kickPlayer(remote, player)
+    if remote and player then
+        if remote:IsA("RemoteEvent") then
+            pcall(function()
+                remote:FireServer(player.UserId)
+            end)
+        elseif remote:IsA("RemoteFunction") then
+            pcall(function()
+                remote:InvokeServer(player.UserId)
+            end)
+        end
+    end
+end
+
+-- Evento do botão kick
